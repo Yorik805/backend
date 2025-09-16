@@ -19,6 +19,24 @@ def get_folder_structure(path):
             data[item] = subfolders
     return data
 
+@app.route("/api/files")
+def get_files():
+    path = request.args.get("path", "")
+    abs_path = os.path.join(BASE_DIR, path)
+
+    if not os.path.exists(abs_path):
+        return jsonify([])
+
+    files = []
+    for item in os.listdir(abs_path):
+        full = os.path.join(abs_path, item)
+        if os.path.isfile(full):
+            files.append({
+                "name": item,
+                "type": os.path.splitext(item)[1][1:],  # extension w/o dot
+                "size": f"{os.path.getsize(full)//1024} KB"
+            })
+    return jsonify(files)
 
 @app.route("/testing/html")
 def send_folder_structure():
@@ -29,3 +47,4 @@ def send_folder_structure():
 @app.route("/")
 def index():
     return render_template("index.html")
+
