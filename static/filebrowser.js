@@ -179,7 +179,7 @@ function buildTree(data) {
         let ul = $("<ul>").addClass("file-tree__subtree");
         data.forEach(item => {
             let li = $("<li>").addClass("file-tree__item");
-            let fileDiv = $("<div>").addClass("file").text(item);
+            let fileDiv = $("<div>").addClass("folder").text(item);
             li.append(fileDiv);
             ul.append(li);
         });
