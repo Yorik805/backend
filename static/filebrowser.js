@@ -169,22 +169,25 @@ function sortTable(n, method) {
         }
     }
 }
+
+
+
 // ----------------- FILE LOADER -----------------
 async function loadFiles(path) {
     try {
-        let resp = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
-        let data = await resp.json();
-        console.log("📦 Files received:", data);
+        const resp = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+        const files = await resp.json();
+        console.log("📦 Files received:", files);
 
         const table = $("#file-table");
         table.find("tr.file-list__file").remove(); // Clear old rows
 
-        data.forEach(file => {
+        files.forEach(file => {
             const row = $("<tr>").addClass("file-list__file");
             row.append($("<td>").text(file.name));
             row.append($("<td>").text(file.type));
             row.append($("<td>").text(file.size));
-            row.append($("<td>").text("privat")); // Static for now
+            row.append($("<td>").text("privat"));
             table.append(row);
         });
     } catch (err) {
@@ -194,9 +197,7 @@ async function loadFiles(path) {
 
 // ----------------- BREADCRUMB -----------------
 function updateFilePath(pathParts) {
-    const ul = $(".file-path").first();
-    ul.empty();
-
+    const ul = $(".file-path").first().empty();
     pathParts.forEach((name, idx) => {
         const li = $("<li>");
         const a = $("<a>").text(name).attr("href", "#");
@@ -220,14 +221,13 @@ function getFolderPath(treeItem) {
     return pathParts;
 }
 
+// ----------------- NAVIGATE VIA BREADCRUMB -----------------
 async function navigateToPath(pathArr) {
     const fullPath = pathArr.join("/");
 
-    // Close all open folders
     $(".file-tree__item").removeClass("file-tree__item--open")
                          .find(".folder--open").removeClass("folder--open");
 
-    // Open folders along the path
     let current = $(".file-tree");
     for (let name of pathArr) {
         const $folderDiv = current.children(".file-tree__item")
@@ -240,42 +240,71 @@ async function navigateToPath(pathArr) {
         current = $folderDiv.siblings(".file-tree__subtree");
     }
 
-    // Load files for the last folder
     await loadFiles(fullPath);
     updateFilePath(pathArr);
 }
 
-// ----------------- BUILD TREE -----------------
-function buildTree(data) {
-    const ul = $("<ul>").addClass("file-tree__subtree");
+// ----------------- LAZY BUILD TREE -----------------
+async function loadSubfolders(treeItem, path) {
+    // Only create subtree if it doesn't exist
+    if (treeItem.children("ul.file-tree__subtree").length) return;
 
-    if (Array.isArray(data)) {
-        data.forEach(item => {
+    try {
+        const resp = await fetch(`/api/folders?path=${encodeURIComponent(path)}`);
+        const data = await resp.json(); // {folders: [], files: []}
+
+        const ul = $("<ul>").addClass("file-tree__subtree");
+
+        // Add subfolders
+        data.folders.forEach(sub => {
             const li = $("<li>").addClass("file-tree__item");
-            const folderDiv = $("<div>").addClass("folder").text(item);
+            const folderDiv = $("<div>").addClass("folder").text(sub);
             li.append(folderDiv);
             ul.append(li);
         });
-    } else {
-        for (let name in data) {
-            const li = $("<li>").addClass("file-tree__item");
-            const folderDiv = $("<div>").addClass("folder").text(name);
-            li.append(folderDiv);
 
-            if (data[name] && Object.keys(data[name]).length > 0) {
-                li.append(buildTree(data[name]));
-            }
-            ul.append(li);
-        }
+        treeItem.append(ul);
+
+        // Re-bind click handler for new folders
+        $(".folder").off("click").on("click", async function () {
+            await folderClickHandler($(this));
+        });
+    } catch (err) {
+        console.error("💥 Error loading subfolders:", err);
     }
+}
 
-    return ul;
+// ----------------- FOLDER CLICK HANDLER -----------------
+async function folderClickHandler(t) {
+    const treeItem = t.closest(".file-tree__item");
+
+    // Toggle open/close
+    const isOpen = t.hasClass("folder--open");
+    t.toggleClass("folder--open", !isOpen);
+    treeItem.toggleClass("file-tree__item--open", !isOpen);
+
+    // Close siblings
+    treeItem.siblings()
+            .removeClass("file-tree__item--open")
+            .find(".folder--open").removeClass("folder--open");
+
+    // Build full path
+    const pathParts = getFolderPath(treeItem);
+    const fullPath = pathParts.join("/");
+
+    // Lazy-load subfolders if needed
+    await loadSubfolders(treeItem, fullPath);
+
+    // Load files in table
+    await loadFiles(fullPath);
+
+    // Update breadcrumb
+    updateFilePath(pathParts);
 }
 
 // ----------------- INIT PROJECT TREE -----------------
 async function debugLoadProjects() {
     console.log("🔎 debugLoadProjects: starting...");
-
     const endpoints = ["/testing/html", "/testing/html/data"];
     let json = null;
 
@@ -283,50 +312,31 @@ async function debugLoadProjects() {
         try {
             const resp = await fetch(ep, {cache: "no-store"});
             const text = await resp.text();
-            try { json = JSON.parse(text); break; } 
-            catch { continue; }
+            json = JSON.parse(text);
+            break;
         } catch { continue; }
     }
 
     if (!json) return console.error("💥 No JSON received from endpoints.");
-
     window.__debugProjectJSON = json;
+
     const treeEls = $(".file-tree");
     if (!treeEls.length) return console.error("🚨 No .file-tree element found.");
 
+    // Build initial top-level tree
     treeEls.each((idx, el) => {
         const $el = $(el).empty();
         for (let project in json) {
             const li = $("<li>").addClass("file-tree__item");
             const folderDiv = $("<div>").addClass("folder").text(project);
             li.append(folderDiv);
-
-            if (json[project] && Object.keys(json[project]).length > 0) {
-                li.append(buildTree(json[project]));
-            }
             $el.append(li);
         }
     });
 
-    // ----------------- FOLDER CLICK HANDLER -----------------
+    // Bind folder click
     $(".folder").off("click").on("click", async function () {
-        const t = $(this);
-        const treeItem = t.closest(".file-tree__item");
-
-        // Toggle open/close
-        const isOpen = t.hasClass("folder--open");
-        t.toggleClass("folder--open", !isOpen);
-        treeItem.toggleClass("file-tree__item--open", !isOpen);
-
-        // Close siblings
-        treeItem.siblings()
-                .removeClass("file-tree__item--open")
-                .find(".folder--open").removeClass("folder--open");
-
-        // Build path and load files
-        const pathParts = getFolderPath(treeItem);
-        await loadFiles(pathParts.join("/"));
-        updateFilePath(pathParts);
+        await folderClickHandler($(this));
     });
 
     console.log("✅ debugLoadProjects finished.");
