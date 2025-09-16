@@ -175,12 +175,13 @@ function sortTable(n, method) {
 // ----------------- FILE LOADER -----------------
 async function loadFiles(path) {
     try {
+        console.log("📂 [DEBUG] loadFiles called for path:", path);
         const resp = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
         const files = await resp.json();
-        console.log("📦 Files received:", files);
+        console.log("📦 [DEBUG] Files received:", files);
 
         const table = $("#file-table");
-        table.find("tr.file-list__file").remove(); // Clear old rows
+        table.find("tr.file-list__file").remove();
 
         files.forEach(file => {
             const row = $("<tr>").addClass("file-list__file");
@@ -191,71 +192,38 @@ async function loadFiles(path) {
             table.append(row);
         });
     } catch (err) {
-        console.error("💥 Error loading files:", err);
+        console.error("💥 [DEBUG] Error loading files:", err);
     }
 }
 
-// ----------------- BREADCRUMB -----------------
-function updateFilePath(pathParts) {
-    const ul = $(".file-path").first().empty();
-    pathParts.forEach((name, idx) => {
-        const li = $("<li>");
-        const a = $("<a>").text(name).attr("href", "#");
-        a.on("click", e => {
-            e.preventDefault();
-            navigateToPath(pathParts.slice(0, idx + 1));
-        });
-        li.append(a);
-        ul.append(li);
-    });
-}
-
-// ----------------- TREE PATH HELPERS -----------------
+// ----------------- GET FULL PATH -----------------
 function getFolderPath(treeItem) {
     const pathParts = [];
     let current = treeItem;
     while (current.length) {
-        pathParts.unshift(current.children(".folder").first().text());
+        const folderName = current.children(".folder").first().text();
+        pathParts.unshift(folderName);
         current = current.parent().closest(".file-tree__item");
     }
+    console.log("📌 [DEBUG] Computed pathParts:", pathParts);
     return pathParts;
 }
 
-// ----------------- NAVIGATE VIA BREADCRUMB -----------------
-async function navigateToPath(pathArr) {
-    const fullPath = pathArr.join("/");
-
-    $(".file-tree__item").removeClass("file-tree__item--open")
-                         .find(".folder--open").removeClass("folder--open");
-
-    let current = $(".file-tree");
-    for (let name of pathArr) {
-        const $folderDiv = current.children(".file-tree__item")
-                                   .children(".folder")
-                                   .filter((i, el) => $(el).text() === name)
-                                   .first();
-        if (!$folderDiv.length) break;
-        $folderDiv.addClass("folder--open");
-        $folderDiv.closest(".file-tree__item").addClass("file-tree__item--open");
-        current = $folderDiv.siblings(".file-tree__subtree");
+// ----------------- LAZY LOAD SUBFOLDERS -----------------
+async function loadSubfolders(treeItem, path) {
+    if (treeItem.children("ul.file-tree__subtree").length) {
+        console.log("✅ [DEBUG] Subtree already exists for", path);
+        return;
     }
 
-    await loadFiles(fullPath);
-    updateFilePath(pathArr);
-}
-
-// ----------------- LAZY BUILD TREE -----------------
-async function loadSubfolders(treeItem, path) {
-    // Only create subtree if it doesn't exist
-    if (treeItem.children("ul.file-tree__subtree").length) return;
-
+    console.log("🔍 [DEBUG] Fetching subfolders for:", path);
     try {
         const resp = await fetch(`/api/folders?path=${encodeURIComponent(path)}`);
-        const data = await resp.json(); // {folders: [], files: []}
+        const data = await resp.json();
+        console.log("📦 [DEBUG] Subfolders response:", data);
 
         const ul = $("<ul>").addClass("file-tree__subtree");
 
-        // Add subfolders
         data.folders.forEach(sub => {
             const li = $("<li>").addClass("file-tree__item");
             const folderDiv = $("<div>").addClass("folder").text(sub);
@@ -265,44 +233,41 @@ async function loadSubfolders(treeItem, path) {
 
         treeItem.append(ul);
 
-        // Re-bind click handler for new folders
+        // Debug: show DOM insertion
+        console.log("🌳 [DEBUG] Updated treeItem HTML:", treeItem.html());
+
+        // Re-bind click handler for newly added folders
         $(".folder").off("click").on("click", async function () {
             await folderClickHandler($(this));
         });
     } catch (err) {
-        console.error("💥 Error loading subfolders:", err);
+        console.error("💥 [DEBUG] Error loading subfolders for", path, err);
     }
 }
 
-// ----------------- FOLDER CLICK HANDLER -----------------
+// ----------------- FOLDER CLICK -----------------
 async function folderClickHandler(t) {
     const treeItem = t.closest(".file-tree__item");
 
-    // Toggle open/close
     const isOpen = t.hasClass("folder--open");
     t.toggleClass("folder--open", !isOpen);
     treeItem.toggleClass("file-tree__item--open", !isOpen);
 
-    // Close siblings
     treeItem.siblings()
             .removeClass("file-tree__item--open")
             .find(".folder--open").removeClass("folder--open");
 
-    // Build full path
     const pathParts = getFolderPath(treeItem);
     const fullPath = pathParts.join("/");
 
-    // Lazy-load subfolders if needed
+    console.log("📂 [DEBUG] Folder clicked:", fullPath);
+
     await loadSubfolders(treeItem, fullPath);
-
-    // Load files in table
     await loadFiles(fullPath);
-
-    // Update breadcrumb
     updateFilePath(pathParts);
 }
 
-// ----------------- INIT PROJECT TREE -----------------
+// ----------------- INIT TREE -----------------
 async function debugLoadProjects() {
     console.log("🔎 debugLoadProjects: starting...");
     const endpoints = ["/testing/html", "/testing/html/data"];
@@ -313,17 +278,20 @@ async function debugLoadProjects() {
             const resp = await fetch(ep, {cache: "no-store"});
             const text = await resp.text();
             json = JSON.parse(text);
+            console.log("✅ [DEBUG] JSON from endpoint:", ep, json);
             break;
-        } catch { continue; }
+        } catch (err) {
+            console.warn("⚠️ [DEBUG] Failed to parse JSON from", ep, err);
+        }
     }
 
     if (!json) return console.error("💥 No JSON received from endpoints.");
+
     window.__debugProjectJSON = json;
 
     const treeEls = $(".file-tree");
     if (!treeEls.length) return console.error("🚨 No .file-tree element found.");
 
-    // Build initial top-level tree
     treeEls.each((idx, el) => {
         const $el = $(el).empty();
         for (let project in json) {
@@ -334,7 +302,6 @@ async function debugLoadProjects() {
         }
     });
 
-    // Bind folder click
     $(".folder").off("click").on("click", async function () {
         await folderClickHandler($(this));
     });
