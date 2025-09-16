@@ -82,7 +82,8 @@ html {
 	 display: block;
 	 background: #404040;
 	 color: #ccc;
-	 overflow: hidden;
+	 overflow-y: hidden;
+	 height: 80dvh;
 	 transition: all 0.5s ease;
 	 width: 0;
 	 max-width: 300px;
@@ -109,6 +110,7 @@ html {
  .ui__main {
 	 flex: 1 1 auto;
 	 display: block;
+	 height: 80dvh;
 	 width: calc(100% - 300px);
 }
  .ui__menu {
