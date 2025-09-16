@@ -170,6 +170,30 @@ function sortTable(n, method) {
     }
 }
 
+// Helper to load files into table
+async function loadFiles(path) {
+    try {
+        let resp = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+        let data = await resp.json();
+        console.log("📦 Files received:", data);
+
+        let table = $("#file-table");
+        table.find("tr.file-list__file").remove(); // clear old
+
+        data.forEach(file => {
+            let row = $("<tr>").addClass("file-list__file");
+            row.append($("<td>").text(file.name));
+            row.append($("<td>").text(file.type));
+            row.append($("<td>").text(file.size));
+            row.append($("<td>").text("privat")); // static for now
+            table.append(row);
+        });
+    } catch (err) {
+        console.error("💥 Error loading files:", err);
+    }
+}
+
+
 
 
 // ----------------- DEBUG + BUILD TREE -----------------
@@ -276,26 +300,46 @@ async function debugLoadProjects() {
         console.log("🔬 HTML preview (truncated):", htmlPreview);
     });
 
-    // Re-bind folder click toggles (same behavior as original)
-    $(".folder").off("click").on("click", function(e) {
-        var t = $(this);
-        var treeItem = t.closest(".file-tree__item");
+    // Re-bind folder click toggles (extended for file loading)
+$(".folder").off("click").on("click", function (e) {
+    let t = $(this);
+    let treeItem = t.closest(".file-tree__item");
 
-        if (t.hasClass("folder--open")) {
-            t.removeClass("folder--open");
-            treeItem.removeClass("file-tree__item--open");
-        } else {
-            t.addClass("folder--open");
-            treeItem.addClass("file-tree__item--open");
-        }
+    // Toggle open/close
+    if (t.hasClass("folder--open")) {
+        t.removeClass("folder--open");
+        treeItem.removeClass("file-tree__item--open");
+    } else {
+        t.addClass("folder--open");
+        treeItem.addClass("file-tree__item--open");
+    }
 
-        // Close siblings
-        treeItem
-            .siblings()
-            .removeClass("file-tree__item--open")
-            .find(".folder--open")
-            .removeClass("folder--open");
-    });
+    // Close siblings
+    treeItem
+        .siblings()
+        .removeClass("file-tree__item--open")
+        .find(".folder--open")
+        .removeClass("folder--open");
+
+    // ✅ NEW PART: check if this folder has NO subtree
+    let hasSubTree = treeItem.children("ul.file-tree__subtree").length > 0;
+
+    if (!hasSubTree) {
+        // Build full path from ancestors
+        let pathParts = [];
+        treeItem.parents(".file-tree__item").each(function () {
+            pathParts.unshift($(this).children(".folder").text());
+        });
+        pathParts.push(t.text());
+        let fullPath = pathParts.join("/");
+
+        console.log("📂 Leaf folder clicked, requesting files for:", fullPath);
+
+        // Call the file loader
+        loadFiles(fullPath);
+    }
+});
+
 
     console.log("✅ debugLoadProjects finished. Click a folder to test toggle.");
 }
