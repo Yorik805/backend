@@ -172,78 +172,122 @@ function sortTable(n, method) {
 
 
 
-// Recursively build the tree
+// ----------------- DEBUG + BUILD TREE -----------------
 function buildTree(data) {
+    // recursive builder returns <ul class="file-tree__subtree">
     let ul = $("<ul>").addClass("file-tree__subtree");
-
     for (let name in data) {
         let li = $("<li>").addClass("file-tree__item");
         let folderDiv = $("<div>").addClass("folder").text(name);
         li.append(folderDiv);
 
-        // If subfolders exist (non-empty object)
-        if (Object.keys(data[name]).length > 0) {
+        if (data[name] && Object.keys(data[name]).length > 0) {
             let subTree = buildTree(data[name]);
             li.append(subTree);
         }
-
         ul.append(li);
     }
-
     return ul;
 }
 
-// Load projects dynamically
-async function loadProjects() {
-    try {
-        let response = await fetch("/testing/html/data"); // 👈 endpoint returning JSON
-        let data = await response.json();
+async function debugLoadProjects() {
+    console.log("🔎 debugLoadProjects: starting...");
 
-        let tree = $(".file-tree");
-        tree.empty(); // clear old items
+    const endpoints = ["/testing/html", "/testing/html/data"];
+    let json = null;
+    let usedEndpoint = null;
 
-        // Top-level projects
-        for (let project in data) {
+    // Try endpoints one by one (log everything)
+    for (const ep of endpoints) {
+        try {
+            console.log("➡️ Trying endpoint:", ep);
+            let resp = await fetch(ep, {cache: "no-store"});
+            console.log("   -> HTTP status:", resp.status, resp.statusText);
+
+            // If non-JSON or 204 etc, grab text and log
+            const text = await resp.text();
+            try {
+                json = JSON.parse(text);
+                usedEndpoint = ep;
+                console.log("✅ Parsed JSON from", ep, json);
+                break;
+            } catch (jsonErr) {
+                console.warn("⚠️ Response from", ep, "is not JSON. Raw text:", text.slice(0,1000));
+                // continue to next endpoint
+            }
+        } catch (err) {
+            console.error("❌ Fetch error for", ep, err);
+        }
+    }
+
+    if (!json) {
+        console.error("💥 No JSON received from any endpoint. Check backend or endpoint paths.");
+        return;
+    }
+
+    // Expose for manual inspection
+    window.__debugProjectJSON = json;
+    console.log("📌 Stored JSON to window.__debugProjectJSON for manual inspection.");
+
+    // Check for UL .file-tree presence
+    const treeEls = $(".file-tree");
+    console.log("🔍 $('.file-tree') matched count:", treeEls.length, treeEls.get());
+    if (treeEls.length === 0) {
+        console.error("🚨 No element with class 'file-tree' found in DOM. Check your template HTML and ensure this script runs AFTER DOM is loaded and jQuery is available.");
+        return;
+    }
+
+    // Append to each matched file-tree UL
+    treeEls.each(function(idx, el) {
+        const $el = $(el);
+        $el.empty();
+        console.log(`🧹 Cleared .file-tree #${idx}`);
+
+        let topCount = 0;
+        for (let project in json) {
+            topCount++;
             let li = $("<li>").addClass("file-tree__item");
             let folderDiv = $("<div>").addClass("folder").text(project);
             li.append(folderDiv);
 
-            // Subfolders
-            if (Object.keys(data[project]).length > 0) {
-                let subTree = buildTree(data[project]);
-                li.append(subTree);
+            if (json[project] && Object.keys(json[project]).length > 0) {
+                let subtree = buildTree(json[project]);
+                li.append(subtree);
             }
-
-            tree.append(li);
+            $el.append(li);
         }
 
-        // Re-bind click toggles
-        $(".folder").off("click").on("click", function(e) {
-            var t = $(this);
-            var treeItem = t.closest(".file-tree__item");
+        console.log(`➕ Appended ${topCount} top-level items into .file-tree #${idx}`);
+        // Log a small HTML preview to ensure DOM insertion
+        let htmlPreview = $el.html().replace(/\s+/g, " ").slice(0, 600);
+        console.log("🔬 HTML preview (truncated):", htmlPreview);
+    });
 
-            if (t.hasClass("folder--open")) {
-                t.removeClass("folder--open");
-                treeItem.removeClass("file-tree__item--open");
-            } else {
-                t.addClass("folder--open");
-                treeItem.addClass("file-tree__item--open");
-            }
+    // Re-bind folder click toggles (same behavior as original)
+    $(".folder").off("click").on("click", function(e) {
+        var t = $(this);
+        var treeItem = t.closest(".file-tree__item");
 
-            // Close siblings
-            treeItem
-                .siblings()
-                .removeClass("file-tree__item--open")
-                .find(".folder--open")
-                .removeClass("folder--open");
-        });
+        if (t.hasClass("folder--open")) {
+            t.removeClass("folder--open");
+            treeItem.removeClass("file-tree__item--open");
+        } else {
+            t.addClass("folder--open");
+            treeItem.addClass("file-tree__item--open");
+        }
 
-    } catch (err) {
-        console.error("Error loading projects:", err);
-    }
+        // Close siblings
+        treeItem
+            .siblings()
+            .removeClass("file-tree__item--open")
+            .find(".folder--open")
+            .removeClass("folder--open");
+    });
+
+    console.log("✅ debugLoadProjects finished. Click a folder to test toggle.");
 }
 
-// Call on startup
-$(document).ready(() => {
-    loadProjects();
+// Run on DOM ready
+$(document).ready(async () => {
+    await debugLoadProjects();
 });
