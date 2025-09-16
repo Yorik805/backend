@@ -174,7 +174,19 @@ function sortTable(n, method) {
 
 // ----------------- DEBUG + BUILD TREE -----------------
 function buildTree(data) {
-    // recursive builder returns <ul class="file-tree__subtree">
+    // Case 1: Array -> treat as files
+    if (Array.isArray(data)) {
+        let ul = $("<ul>").addClass("file-tree__subtree");
+        data.forEach(item => {
+            let li = $("<li>").addClass("file-tree__item");
+            let fileDiv = $("<div>").addClass("file").text(item);
+            li.append(fileDiv);
+            ul.append(li);
+        });
+        return ul;
+    }
+
+    // Case 2: Object -> recurse into subfolders
     let ul = $("<ul>").addClass("file-tree__subtree");
     for (let name in data) {
         let li = $("<li>").addClass("file-tree__item");
@@ -189,6 +201,7 @@ function buildTree(data) {
     }
     return ul;
 }
+
 
 async function debugLoadProjects() {
     console.log("🔎 debugLoadProjects: starting...");
