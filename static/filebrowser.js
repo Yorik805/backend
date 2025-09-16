@@ -194,6 +194,44 @@ async function loadFiles(path) {
 }
 
 
+function updateFilePath(pathArr) {
+    let $filePath = $(".file-path").empty();
+    pathArr.forEach((name, idx) => {
+        let $li = $("<li>");
+        let $a = $("<a>").text(name).attr("href", "#");
+        $a.on("click", function(e) {
+            e.preventDefault();
+            navigateToPath(pathArr.slice(0, idx + 1));
+        });
+        $li.append($a);
+        $filePath.append($li);
+    });
+}
+
+// Navigate to a specific path from breadcrumb click
+async function navigateToPath(pathArr) {
+    let fullPath = pathArr.join("/");
+    updateFilePath(pathArr);
+
+    // Open tree items along the path
+    $(".file-tree__item").removeClass("file-tree__item--open")
+                          .find(".folder--open").removeClass("folder--open");
+
+    let current = $(".file-tree");
+    for (let name of pathArr) {
+        let $folderDiv = current.children(".file-tree__item")
+                                .children(".folder")
+                                .filter((i, el) => $(el).text() === name);
+        if ($folderDiv.length) {
+            $folderDiv.addClass("folder--open");
+            $folderDiv.closest(".file-tree__item").addClass("file-tree__item--open");
+            current = $folderDiv.siblings(".file-tree__subtree");
+        }
+    }
+
+    // Load files for this path
+    await loadFiles(fullPath);
+}
 
 
 // ----------------- DEBUG + BUILD TREE -----------------
@@ -322,22 +360,22 @@ $(".folder").off("click").on("click", function (e) {
         .removeClass("folder--open");
 
     // ✅ NEW PART: check if this folder has NO subtree
-    let hasSubTree = treeItem.children("ul.file-tree__subtree").length > 0;
+    // ✅ NEW PART: ALWAYS load files on folder click
+let pathParts = [];
+treeItem.parents(".file-tree__item").each(function () {
+    pathParts.unshift($(this).children(".folder").text());
+});
+pathParts.push(t.text());
+let fullPath = pathParts.join("/");
 
-    if (!hasSubTree) {
-        // Build full path from ancestors
-        let pathParts = [];
-        treeItem.parents(".file-tree__item").each(function () {
-            pathParts.unshift($(this).children(".folder").text());
-        });
-        pathParts.push(t.text());
-        let fullPath = pathParts.join("/");
+console.log("📂 Folder clicked, requesting files for:", fullPath);
 
-        console.log("📂 Leaf folder clicked, requesting files for:", fullPath);
+// Load files regardless of subtree
+loadFiles(fullPath);
 
-        // Call the file loader
-        loadFiles(fullPath);
-    }
+// Update file path breadcrumb
+updateFilePath(pathParts);
+
 });
 
 
