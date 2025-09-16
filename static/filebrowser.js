@@ -246,45 +246,26 @@ async function loadSubfolders(treeItem, path) {
 }
 
 // ----------------- FOLDER CLICK -----------------
-// ----------------- FOLDER CLICK -----------------
 async function folderClickHandler(t) {
     const treeItem = t.closest(".file-tree__item");
 
-    // Toggle open/close
     const isOpen = t.hasClass("folder--open");
     t.toggleClass("folder--open", !isOpen);
     treeItem.toggleClass("file-tree__item--open", !isOpen);
 
-    // Close siblings (same level)
     treeItem.siblings()
             .removeClass("file-tree__item--open")
-            .find(".folder--open").removeClass("folder--open")
-            .siblings("ul.file-tree__subtree").slideUp(); // hide their children
+            .find(".folder--open").removeClass("folder--open");
 
-    // If this folder has a subtree, toggle its visibility
-    const $subtree = treeItem.children("ul.file-tree__subtree");
-    if ($subtree.length) {
-        if (isOpen) {
-            $subtree.slideUp();  // closing folder → hide children
-        } else {
-            $subtree.slideDown(); // opening folder → show children
-        }
-    }
-
-    // Build full path
     const pathParts = getFolderPath(treeItem);
     const fullPath = pathParts.join("/");
 
-    // Lazy-load subfolders if needed
+    console.log("📂 [DEBUG] Folder clicked:", fullPath);
+
     await loadSubfolders(treeItem, fullPath);
-
-    // Load files in table
     await loadFiles(fullPath);
-
-    // Update breadcrumb
     updateFilePath(pathParts);
 }
-
 
 // ----------------- INIT TREE -----------------
 async function debugLoadProjects() {
