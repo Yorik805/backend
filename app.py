@@ -1,31 +1,31 @@
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template
 import os
 
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "BROOOOO 🚀🔥 Your first Python backend is alive!"
+BASE_DIR = "projects"  # 👈 point this to your projects folder
 
-@app.route("/about")
-def about():
-    return "This is Yorik’s Crazy Project Vault 💀⚡"
+def get_folder_structure(path):
+    data = {}
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        # only take folders (skip files with '.')
+        if os.path.isdir(item_path):
+            # check inside for subfolders
+            subfolders = [
+                sub for sub in os.listdir(item_path)
+                if os.path.isdir(os.path.join(item_path, sub))
+            ]
+            data[item] = subfolders
+    return data
 
-@app.route("/html")
-def html_page():
-    return """
-    <h1>🔥 WELCOME BRO 🔥</h1>
-    <p>This is your custom page!</p>
-    """
-
-@app.route("/user/<name>")
-def greet(name):
-    return f"Yo {name} 😎🔥 Welcome to the Vault!"
 
 @app.route("/testing/html")
-def file_browser():
-    return render_template("filebrowser.html")
+def send_folder_structure():
+    structure = get_folder_structure(BASE_DIR)
+    return jsonify(structure)  # 👈 frontend can fetch this
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+
+@app.route("/")
+def index():
+    return render_template("index.html")
