@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import os
 
 app = Flask(__name__)
@@ -47,4 +47,5 @@ def send_folder_structure():
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
