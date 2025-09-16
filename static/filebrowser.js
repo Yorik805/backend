@@ -171,6 +171,27 @@ function sortTable(n, method) {
 }
 
 
+// ----------------- BREADCRUMB -----------------
+function updateFilePath(pathParts) {
+    const ul = $(".file-path").first().empty();
+
+    pathParts.forEach((name, idx) => {
+        const li = $("<li>");
+        const a = $("<a>")
+            .text(name)
+            .attr("href", "#");
+
+        // When clicking breadcrumb → navigate back
+        a.on("click", e => {
+            e.preventDefault();
+            navigateToPath(pathParts.slice(0, idx + 1));
+        });
+
+        li.append(a);
+        ul.append(li);
+    });
+}
+
 
 // ----------------- FILE LOADER -----------------
 async function loadFiles(path) {
