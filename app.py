@@ -9,6 +9,10 @@ app = Flask(__name__)
 def home():
     return "BROOOOO 🚀🔥 Your Python backend is alive!"
 
+@app.route("/testing/html")
+def file_browser():
+    return render_template("filebrowser.html")
+
 @app.route("/about")
 def about():
     return "This is Yorik’s Crazy Project Vault 💀⚡"
@@ -30,6 +34,7 @@ def greet(name):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
