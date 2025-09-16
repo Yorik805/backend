@@ -172,30 +172,45 @@ function sortTable(n, method) {
 
 
 
+// Recursively build the tree
+function buildTree(data) {
+    let ul = $("<ul>").addClass("file-tree__subtree");
+
+    for (let name in data) {
+        let li = $("<li>").addClass("file-tree__item");
+        let folderDiv = $("<div>").addClass("folder").text(name);
+        li.append(folderDiv);
+
+        // If subfolders exist (non-empty object)
+        if (Object.keys(data[name]).length > 0) {
+            let subTree = buildTree(data[name]);
+            li.append(subTree);
+        }
+
+        ul.append(li);
+    }
+
+    return ul;
+}
+
 // Load projects dynamically
 async function loadProjects() {
     try {
-        let response = await fetch("/testing/html");
+        let response = await fetch("/testing/html/data"); // 👈 endpoint returning JSON
         let data = await response.json();
 
         let tree = $(".file-tree");
-        tree.empty(); // clear old hardcoded items
+        tree.empty(); // clear old items
 
-        // Build projects
+        // Top-level projects
         for (let project in data) {
             let li = $("<li>").addClass("file-tree__item");
             let folderDiv = $("<div>").addClass("folder").text(project);
             li.append(folderDiv);
 
-            // If project has subfolders
-            if (data[project].length > 0) {
-                let subTree = $("<ul>").addClass("file-tree__subtree");
-                data[project].forEach(sub => {
-                    let subLi = $("<li>").addClass("file-tree__item");
-                    let subDiv = $("<div>").addClass("folder").text(sub);
-                    subLi.append(subDiv);
-                    subTree.append(subLi);
-                });
+            // Subfolders
+            if (Object.keys(data[project]).length > 0) {
+                let subTree = buildTree(data[project]);
                 li.append(subTree);
             }
 
@@ -205,18 +220,18 @@ async function loadProjects() {
         // Re-bind click toggles
         $(".folder").off("click").on("click", function(e) {
             var t = $(this);
-            var tree = t.closest(".file-tree__item");
+            var treeItem = t.closest(".file-tree__item");
 
             if (t.hasClass("folder--open")) {
                 t.removeClass("folder--open");
-                tree.removeClass("file-tree__item--open");
+                treeItem.removeClass("file-tree__item--open");
             } else {
                 t.addClass("folder--open");
-                tree.addClass("file-tree__item--open");
+                treeItem.addClass("file-tree__item--open");
             }
 
             // Close siblings
-            tree
+            treeItem
                 .siblings()
                 .removeClass("file-tree__item--open")
                 .find(".folder--open")
@@ -232,4 +247,3 @@ async function loadProjects() {
 $(document).ready(() => {
     loadProjects();
 });
-
