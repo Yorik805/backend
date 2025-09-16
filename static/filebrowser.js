@@ -169,3 +169,67 @@ function sortTable(n, method) {
         }
     }
 }
+
+
+
+// Load projects dynamically
+async function loadProjects() {
+    try {
+        let response = await fetch("/testing/html");
+        let data = await response.json();
+
+        let tree = $(".file-tree");
+        tree.empty(); // clear old hardcoded items
+
+        // Build projects
+        for (let project in data) {
+            let li = $("<li>").addClass("file-tree__item");
+            let folderDiv = $("<div>").addClass("folder").text(project);
+            li.append(folderDiv);
+
+            // If project has subfolders
+            if (data[project].length > 0) {
+                let subTree = $("<ul>").addClass("file-tree__subtree");
+                data[project].forEach(sub => {
+                    let subLi = $("<li>").addClass("file-tree__item");
+                    let subDiv = $("<div>").addClass("folder").text(sub);
+                    subLi.append(subDiv);
+                    subTree.append(subLi);
+                });
+                li.append(subTree);
+            }
+
+            tree.append(li);
+        }
+
+        // Re-bind click toggles
+        $(".folder").off("click").on("click", function(e) {
+            var t = $(this);
+            var tree = t.closest(".file-tree__item");
+
+            if (t.hasClass("folder--open")) {
+                t.removeClass("folder--open");
+                tree.removeClass("file-tree__item--open");
+            } else {
+                t.addClass("folder--open");
+                tree.addClass("file-tree__item--open");
+            }
+
+            // Close siblings
+            tree
+                .siblings()
+                .removeClass("file-tree__item--open")
+                .find(".folder--open")
+                .removeClass("folder--open");
+        });
+
+    } catch (err) {
+        console.error("Error loading projects:", err);
+    }
+}
+
+// Call on startup
+$(document).ready(() => {
+    loadProjects();
+});
+
