@@ -7,7 +7,7 @@ app = Flask(__name__)
 # route: defines what happens when user goes to "/"
 @app.route("/")
 def home():
-    return "BROOOOO 🚀🔥 Your first Python backend is alive!"
+    return "BROOOOO 🚀🔥 Your Python backend is alive!"
 
 @app.route("/about")
 def about():
@@ -30,5 +30,6 @@ def greet(name):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
